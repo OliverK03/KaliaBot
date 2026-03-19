@@ -9,6 +9,8 @@ async def handle_response(text: str) -> str:
         return 'juo lissää'
     if 'kalja' in processed:
         return 'opettelee kirjottaa'
+    if 'hoploppi' in processed:
+        return 'ei oo mikää vitun hoploppi!'
     
     return 'juo kaliaaa'
     
@@ -21,12 +23,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if message_type == 'group':
         if BOT_USERNAME in text:
             new_text: str = text.replace(BOT_USERNAME, '').strip()
-            response: str = handle_response(new_text)
+            response: str = await handle_response(new_text)
         else:
             return
         
     else:
-        response: str = handle_response(text)
+        response: str = await handle_response(text)
 
     print('Bot:', response)
     await update.message.reply_text(response)
