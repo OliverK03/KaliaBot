@@ -2,7 +2,8 @@ import os
 from config.settings import BOT_TOKEN, BOT_USERNAME
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
-from handlers.counter import counter_command
+from handlers.counter import kalia_command
+from handlers.count import count_command
 from handlers.messages import handle_message, handle_response
 
 #Commands
@@ -27,7 +28,8 @@ if __name__ == '__main__':
     app.add_handler(CommandHandler('start', start_command))
     app.add_handler(CommandHandler('help', help_command))
     app.add_handler(CommandHandler('custom', custom_command))
-    app.add_handler(CommandHandler('counter', counter_command))
+    app.add_handler(CommandHandler('kalia', kalia_command))
+    app.add_handler(CommandHandler('kaliacount', count_command))
 
     # Messages
     app.add_handler(MessageHandler(filters.TEXT, handle_message))

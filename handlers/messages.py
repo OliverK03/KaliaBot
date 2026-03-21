@@ -2,6 +2,8 @@ from telegram import Update
 from telegram.ext import ContextTypes
 from config.settings import BOT_USERNAME
 
+
+# Response Handler
 async def handle_response(text: str) -> str:
     processed: str = text.lower()
 
@@ -9,6 +11,7 @@ async def handle_response(text: str) -> str:
         return 'juo lissää'
     if 'kalja' in processed:
         return 'opettelee kirjottaa'
+    # varsinkin mutterille
     if 'hoploppi' in processed:
         return 'ei oo mikää vitun hoploppi!'
     
