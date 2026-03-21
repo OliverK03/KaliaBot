@@ -1,2 +1,5 @@
 .env
 .venv/
+data/*.json
+*.pyo
+*.pyc
