@@ -39,10 +39,10 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def custom_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text('lissää kaliaa')
-
+"""
 async def error(update: Update, context: ContextTypes.DEFAULT_TYPE):
     print(f'Update {update} caused error {context.error}')
-"""
+
 
 if __name__ == '__main__':
     print('Starting bot...')
