@@ -5,7 +5,8 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 from handlers.counter import kalia_command
 from handlers.count import count_command
 from handlers.help import help_command
-from handlers.messages import handle_message, handle_response
+from handlers.messages import handle_message
+from handlers.text_or_caption import handle_text_or_caption_command
 
 #Commands
 
@@ -31,6 +32,8 @@ if __name__ == '__main__':
 
     # Messages
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    # Caption
+    app.add_handler(MessageHandler(filters.PHOTO & filters.CAPTION, handle_text_or_caption_command))
 
     # Errors
     app.add_error_handler(error)

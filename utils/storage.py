@@ -25,7 +25,7 @@ def get_count(user_id: str) -> int:
         _init_db(conn)
         row = conn.execute(
             "SELECT count FROM user_counts WHERE user_id = ?",
-            (user_id)
+            (user_id,)
         ).fetchone()
         return row[0] if row else 0
     
@@ -38,10 +38,10 @@ def increment_count(user_id: str) -> int:
             VALUES(?, 1)
             ON CONFLICT(user_id) DO UPDATE SET count = count + 1        
             """,
-            (user_id),
+            (user_id,),
         )
         conn.commit()
         return conn.execute(
             "SELECT count FROM user_counts WHERE user_id = ?",
-            (user_id),
+            (user_id,)
         ).fetchone()[0]
