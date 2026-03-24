@@ -39,19 +39,17 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def custom_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text('lissää kaliaa')
-
+"""
 async def error(update: Update, context: ContextTypes.DEFAULT_TYPE):
     print(f'Update {update} caused error {context.error}')
-"""
+
 
 if __name__ == '__main__':
     print('Starting bot...')
     app = Application.builder().token(BOT_TOKEN).build()
 
     # Commands
-    app.add_handler(CommandHandler('start', start_command))
     app.add_handler(CommandHandler('help', help_command))
-    app.add_handler(CommandHandler('custom', custom_command))
     app.add_handler(CommandHandler('kalia', kalia_command))
     app.add_handler(CommandHandler('kaliacount', count_command))
     app.add_handler(CommandHandler('groupcount', groupcount_command))
