@@ -3,8 +3,9 @@ from telegram.ext import ContextTypes
 from utils.storage import get_count
 
 async def count_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = str(update.effective_chat.id)
     user_id = str(update.effective_user.id)
-    count = get_count(user_id,)
+    count = get_count(chat_id, user_id)
 
     if count <= 10:
         await update.message.reply_text(f'Kaliaa juotu {count} kpl. Avaappa se kalia jo..')
