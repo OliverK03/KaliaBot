@@ -1,8 +1,7 @@
-import json
 import os
 import sqlite3
 
-DATA_DIR = "data"
+DATA_DIR = os.getenv("DATA_DIR", "data")
 DB_FILE = os.path.join(DATA_DIR, "user_count.db")
 
 def _get_connection():
