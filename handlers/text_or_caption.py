@@ -13,6 +13,8 @@ async def handle_text_or_caption_command(update: Update, context: ContextTypes.D
     
     command = content.split(maxsplit=1)[0].lower()
     command = command.split("@", maxsplit=1)[0]
+    print("content:",content)
+    print("command:",command)
 
     if command == "/kalia":
         await kalia_command(update, context)
