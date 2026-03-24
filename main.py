@@ -4,6 +4,7 @@ from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 from handlers.counter import kalia_command
 from handlers.count import count_command
+from handlers.groupcount import groupcount_command
 from handlers.help import help_command
 from handlers.messages import handle_message
 from handlers.text_or_caption import handle_text_or_caption_command
@@ -29,6 +30,7 @@ if __name__ == '__main__':
     app.add_handler(CommandHandler('custom', custom_command))
     app.add_handler(CommandHandler('kalia', kalia_command))
     app.add_handler(CommandHandler('kaliacount', count_command))
+    app.add_handler(CommandHandler('groupcount', groupcount_command))
 
     # Messages
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
