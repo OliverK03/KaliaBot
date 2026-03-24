@@ -1,37 +1,34 @@
 from telegram import Update
 from telegram.ext import ContextTypes
-from config.settings import BOT_USERNAME
+from typing import Optional
 
 
 # Response Handler
-async def handle_response(text: str) -> str:
+async def handle_response(text: str) -> Optional[str]:
     processed: str = text.lower()
+    rules = [
+        ({"kalja"}, "opettele kirjottaa"),
+        ({"hoplop"}, "ei oo mikään vitun hoploppi"),
+    ]
+    for triggers, reply in rules:
+        if any(trigger in processed for trigger in triggers):
+            return reply
 
-    if 'kalia' in processed:
-        return 'juo lissää'
-    if 'kalja' in processed:
-        return 'opettelee kirjottaa'
-    # varsinkin mutterille
-    if 'hoploppi' in processed:
-        return 'ei oo mikää vitun hoploppi!'
-    
-    return 'juo kaliaaa'
-    
+    return None
+
+# Gives info to console
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update.message or not update.message.text:
+        return
+
     message_type: str = update.message.chat.type
     text: str = update.message.text
 
     print(f'User ({update.message.chat.id}) in {message_type}: "{text}"')
 
-    if message_type in ('group', 'supergroup'):
-        if BOT_USERNAME in text:
-            new_text: str = text.replace(BOT_USERNAME, '').strip()
-            response: str = await handle_response(new_text)
-        else:
-            return
-        
-    else:
-        response: str = await handle_response(text)
+    response: Optional[str] = await handle_response(text)
+    if not response:
+        return
 
     print('Bot:', response)
     await update.message.reply_text(response)

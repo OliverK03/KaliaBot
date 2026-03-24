@@ -4,15 +4,14 @@ from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 from handlers.counter import kalia_command
 from handlers.count import count_command
-from handlers.messages import handle_message, handle_response
+from handlers.help import help_command
+from handlers.messages import handle_message
+from handlers.text_or_caption import handle_text_or_caption_command
 
 #Commands
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text('Kaliaaa!!')
-
-async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text('Kalia')
 
 async def custom_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text('lissää kaliaa')
@@ -32,7 +31,9 @@ if __name__ == '__main__':
     app.add_handler(CommandHandler('kaliacount', count_command))
 
     # Messages
-    app.add_handler(MessageHandler(filters.TEXT, handle_message))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    # Caption
+    app.add_handler(MessageHandler(filters.PHOTO & filters.CAPTION, handle_text_or_caption_command))
 
     # Errors
     app.add_error_handler(error)

@@ -1,28 +1,18 @@
 from telegram import Update
 from telegram.ext import ContextTypes
-from utils.storage import load_counts
+from utils.storage import get_count
 
 async def count_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
-    counts = load_counts()
+    count = get_count(user_id,)
 
-    if counts[user_id] <= 10:
-        await update.message.reply_text(
-            f'Kaliaa juotu {counts[user_id]} kpl. Avaappa se kalia jo..'
-        )
-    elif counts[user_id] <= 50:
-        await update.message.reply_text(
-            f'Kaliaa juotu {counts[user_id]} kpl. Muutama kalia mahtuis vielä.'
-        )
-    elif counts[user_id] <= 125:
-        await update.message.reply_text(
-            f'Kaliaa juotu {counts[user_id]} kpl. Aaa että.'
-        )
-    elif counts[user_id] <= 250:
-        await update.message.reply_text(
-            f'Kaliaa juotu {counts[user_id]} kpl. Kovaa kyytiä'
-        )
-    elif counts[user_id] > 250:
-        await update.message.reply_text(
-            f'Kaliaa juotu {counts[user_id]} kpl. Kaliaherra on ylpeä!'
-        )
+    if count <= 10:
+        await update.message.reply_text(f'Kaliaa juotu {count} kpl. Avaappa se kalia jo..')
+    elif count <= 50:
+        await update.message.reply_text(f'Kaliaa juotu {count} kpl. Muutama kalia mahtuis vielä.')
+    elif count <= 125:
+        await update.message.reply_text(f'Kaliaa juotu {count} kpl. Aaa että.')
+    elif count <= 250:
+        await update.message.reply_text(f'Kaliaa juotu {count} kpl. Kovaa kyytiä')
+    else:
+        await update.message.reply_text(f'Kaliaa juotu {count} kpl. Kaliaherra on ylpeä!')
