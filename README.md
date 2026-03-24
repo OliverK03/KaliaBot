@@ -4,9 +4,9 @@ Telegram botti, joka on tehty pääasiassa Kaliakunta telegram ryhmään, mutta 
 Botin löytää telegrammista @kaliaa_bot
 
 ## Contents
-- [Komennot](#features)
-- [Tekniset tiedot](#technical-information)
-- [Other information](#other-information)
+- [Komennot](#komennot)
+- [Tekniset tiedot](#Tekniset-tiedot)
+- [Muut tiedot](#Muut-tiedot)
 
 ## Komennot
 
