@@ -3,11 +3,6 @@
 Telegram botti, joka on tehty pääasiassa Kaliakunta telegram ryhmään, mutta botin voi lisätä myös muihin ryhmiin tai käyttää yksityisviesteissä.
 Botin löytää telegrammista @kaliaa_bot
 
-## Contents
-- [Komennot](#komennot)
-- [Tekniset tiedot](#Tekniset-tiedot)
-- [Muut tiedot](#Muut-tiedot)
-
 ## Komennot
 
 ### 🍻 Kalia
