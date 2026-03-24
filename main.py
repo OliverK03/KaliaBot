@@ -30,7 +30,7 @@ class HealthHandler(BaseHTTPRequestHandler):
 def start_health_server():
     port = int(os.getenv("PORT", "10000"))
     server = HTTPServer(("0.0.0.0", port), HealthHandler)
-    threading.Thread(targer=server.serve_forever, deamon=True).start()
+    threading.Thread(target=server.serve_forever, deamon=True).start()
     print(f"Health server listerning on port {port}")
 
 """ Commands, perjaatteessa kyl nä on turhat lol
