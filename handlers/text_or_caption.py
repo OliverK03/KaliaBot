@@ -1,22 +1,31 @@
+import re
+
 from telegram import Update
 from telegram.ext import ContextTypes
-from handlers.counter import kalia_command
+
 from handlers.count import count_command
+from handlers.counter import kalia_command
+from handlers.scoreboard import scoreboard_command
+
 
 async def handle_text_or_caption_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message:
         return
 
-    content = (update.message.text or update.message.caption or "").strip()
-    if not content:
+    caption = (update.message.caption or "").strip()
+    if not caption:
         return
-    
-    command = content.split(maxsplit=1)[0].lower()
-    command = command.split("@", maxsplit=1)[0]
-    print("content:",content)
-    print("command:",command)
 
-    if command == "/kalia":
+    commands = {
+        match.split("@", maxsplit=1)[0]
+        for match in re.findall(r"/[\w@]+", caption.lower())
+    }
+    print("caption:", caption)
+    print("commands:", commands)
+
+    if "/kalia" in commands:
         await kalia_command(update, context)
-    elif command == "/kaliacount":
+    elif "/kaliacount" in commands:
         await count_command(update, context)
+    elif commands.intersection({"/scoreboard", "/kaliatop"}):
+        await scoreboard_command(update, context)
