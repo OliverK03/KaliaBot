@@ -128,6 +128,16 @@ def get_monthly_scoreboard(chat_id: str, year_month: str, limit: int = 10) -> li
         ).fetchall()
 
 
+def get_monthly_group_total(chat_id: str, year_month: str) -> int:
+    with _get_connection() as conn:
+        _init_db(conn)
+        row = conn.execute(
+            "SELECT COALESCE(SUM(count), 0) FROM monthly_counts WHERE chat_id = ? AND year_month = ?",
+            (chat_id, year_month),
+        ).fetchone()
+        return row[0] if row else 0
+
+
 def get_all_chat_ids() -> list[str]:
     with _get_connection() as conn:
         _init_db(conn)

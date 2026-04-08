@@ -18,6 +18,7 @@ from handlers.scoreboard import build_scoreboard_text, scoreboard_command
 from handlers.text_or_caption import handle_text_or_caption_command
 from utils.storage import (
     get_all_chat_ids,
+    get_monthly_group_total,
     get_monthly_scoreboard,
     has_monthly_report_been_sent,
     mark_monthly_report_sent,
@@ -70,12 +71,13 @@ async def send_monthly_kalia_report(context: ContextTypes.DEFAULT_TYPE):
             continue
 
         rows = get_monthly_scoreboard(chat_id, year_month)
+        monthly_total = get_monthly_group_total(chat_id, year_month)
         message = await build_scoreboard_text(
             context,
             chat_id,
             rows,
-            f"🍺 Kalia kuukausiraportti ({year_month})",
-            f"🍺 Kalia kuukausiraportti ({year_month})\nEi /kalia-komentoja viime kuussa.",
+            f"🍺 Kalia kuukausiraportti ({year_month})\nYhteensä ryhmässä: {monthly_total} juotua kaliaa.",
+            f"🍺 Kalia kuukausiraportti ({year_month})\nYhteensä ryhmässä: 0 juotua kaliaa.\nEi juotuja kalioja viime kuussa.",
         )
 
         try:
