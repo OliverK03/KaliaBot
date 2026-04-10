@@ -82,7 +82,7 @@ async def send_monthly_kalia_report(context: ContextTypes.DEFAULT_TYPE):
             context,
             chat_id,
             rows,
-            f"🍺 Kalia kuukausiraportti ({year_month})\nYhteensä ryhmässä: {monthly_total} juotua kaliaa, joista pyhiä {monthly_pyhat}.",
+            f"🍺 Kalia kuukausiraportti ({year_month})\nYhteensä ryhmässä: {monthly_total} juotua kaliaa."
             f"🍺 Kalia kuukausiraportti ({year_month})\nYhteensä ryhmässä: 0 juotua kaliaa.\nEi juotuja kalioja viime kuussa.",
         )
 
@@ -91,8 +91,8 @@ async def send_monthly_kalia_report(context: ContextTypes.DEFAULT_TYPE):
             context,
             chat_id,
             pyha_rows,
-            "🙏 Pyhät kalia-nautiskelijat (viime kuu)",
-            "Viime kuussa ei ollut yhtään pyhää kaliaa.",
+            f"Guinnessejä juotu {monthly_pyhat}."
+            f"Viime kuussa ei ollut yhtään pyhää kaliaa.",
         )
 
         message = f"{kalia_message}\n\n{pyha_message}"
@@ -123,7 +123,7 @@ if __name__ == '__main__':
     app.add_handler(CommandHandler('kaliacount', count_command))
     app.add_handler(CommandHandler('groupcount', groupcount_command))
     app.add_handler(CommandHandler(['scoreboard', 'kaliatop'], scoreboard_command))
-    app.add_handler(CommandHandler(['pyhascoreboard, pyhatop'], pyhascoreboard_command))
+    app.add_handler(CommandHandler(['pyhascoreboard', 'pyhatop'], pyhascoreboard_command))
 
     # Messages
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
