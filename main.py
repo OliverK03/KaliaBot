@@ -10,15 +10,18 @@ from telegram.error import TelegramError
 from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
 
 from handlers.count import count_command
-from handlers.counter import kalia_command
+from handlers.pyhacounter import pyha_command
 from handlers.groupcount import groupcount_command
 from handlers.help import help_command
 from handlers.messages import handle_message
+from handlers.pyhascoreboard import build_pyhascoreboard_text, pyhascoreboard_command
 from handlers.scoreboard import build_scoreboard_text, scoreboard_command
 from handlers.text_or_caption import handle_text_or_caption_command
 from utils.storage import (
     get_all_chat_ids,
     get_monthly_group_total,
+    get_monthly_group_pyha_total,
+    get_monthly_pyhascoreboard,
     get_monthly_scoreboard,
     has_monthly_report_been_sent,
     mark_monthly_report_sent,
@@ -48,7 +51,7 @@ def start_health_server():
 
 
 try:
-    REPORT_TIMEZONE = ZoneInfo(os.getenv("REPORT_TIMEZONE", "Europe/Helsinki"))
+    REPORT_TIMEZONE = ZoneInfo(os.getenv("REPORT_TIMEZONE"))
 except ZoneInfoNotFoundError:
     REPORT_TIMEZONE = timezone.utc
     print("REPORT_TIMEZONE not found, falling back to UTC.")
@@ -71,14 +74,28 @@ async def send_monthly_kalia_report(context: ContextTypes.DEFAULT_TYPE):
             continue
 
         rows = get_monthly_scoreboard(chat_id, year_month)
+        pyha_rows = get_monthly_pyhascoreboard(chat_id, year_month)
         monthly_total = get_monthly_group_total(chat_id, year_month)
-        message = await build_scoreboard_text(
+        monthly_pyhat = get_monthly_group_pyha_total(chat_id, year_month)
+        # Peruskalia-scoreboard
+        kalia_message = await build_scoreboard_text(
             context,
             chat_id,
             rows,
-            f"🍺 Kalia kuukausiraportti ({year_month})\nYhteensä ryhmässä: {monthly_total} juotua kaliaa.",
+            f"🍺 Kalia kuukausiraportti ({year_month})\nYhteensä ryhmässä: {monthly_total} juotua kaliaa, joista pyhiä {monthly_pyhat}.",
             f"🍺 Kalia kuukausiraportti ({year_month})\nYhteensä ryhmässä: 0 juotua kaliaa.\nEi juotuja kalioja viime kuussa.",
         )
+
+        # Pyhä-kalia-scoreboard (perustuu pyha_countiin)
+        pyha_message = await build_scoreboard_text(
+            context,
+            chat_id,
+            pyha_rows,
+            "🙏 Pyhät kalia-nautiskelijat (viime kuu)",
+            "Viime kuussa ei ollut yhtään pyhää kaliaa.",
+        )
+
+        message = f"{kalia_message}\n\n{pyha_message}"
 
         try:
             await context.bot.send_message(chat_id=int(chat_id), text=message)
@@ -106,6 +123,7 @@ if __name__ == '__main__':
     app.add_handler(CommandHandler('kaliacount', count_command))
     app.add_handler(CommandHandler('groupcount', groupcount_command))
     app.add_handler(CommandHandler(['scoreboard', 'kaliatop'], scoreboard_command))
+    app.add_handler(CommandHandler(['pyhascoreboard, pyhatop'], pyhascoreboard_command))
 
     # Messages
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))

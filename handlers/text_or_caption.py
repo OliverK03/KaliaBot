@@ -5,6 +5,7 @@ from telegram.ext import ContextTypes
 
 from handlers.count import count_command
 from handlers.counter import kalia_command
+from handlers.pyhacounter import pyha_command
 from handlers.scoreboard import scoreboard_command
 
 
@@ -25,6 +26,8 @@ async def handle_text_or_caption_command(update: Update, context: ContextTypes.D
 
     if "/kalia" in commands:
         await kalia_command(update, context)
+    elif "/pyha" in commands:
+        await pyha_command(update, context)
     elif "/kaliacount" in commands:
         await count_command(update, context)
     elif commands.intersection({"/scoreboard", "/kaliatop"}):

@@ -18,6 +18,7 @@ def _init_db(conn):
         chat_id TEXT NOT NULL,
         user_id TEXT NOT NULL,
         count INTEGER NOT NULL,
+        pyha_count INTEGER NOT NULL DEFAULT 0,
         PRIMARY KEY (chat_id, user_id)
         )
         """
@@ -29,6 +30,7 @@ def _init_db(conn):
         user_id TEXT NOT NULL,
         year_month TEXT NOT NULL,
         count INTEGER NOT NULL,
+        pyha_count INTEGER NOT NULL DEFAULT 0,
         PRIMARY KEY (chat_id, user_id, year_month)
         )
         """
@@ -43,6 +45,18 @@ def _init_db(conn):
         )
         """
     )
+
+    for table in ("user_counts", "monthly_counts"):
+        cursor = conn.execute(f"PRAGMA table_info({table})")
+        columns = {row[1] for row in cursor.fetchall()}
+        if "pyha_count" not in columns:
+            conn.execute(
+                f"ALTER TABLE {table} ADD COLUMN pyha_count INTEGER NOT NULL DEFAULT 0"
+            )
+        # Ensure no NULL values remain (for older schemas without DEFAULT)
+        conn.execute(
+            f"UPDATE {table} SET pyha_count = 0 WHERE pyha_count IS NULL"
+        )
     conn.commit()
 
 
@@ -58,6 +72,15 @@ def get_count(chat_id: str, user_id: str) -> int:
             (chat_id, user_id),
         ).fetchone()
         return row[0] if row else 0
+    
+def get_pyhat(chat_id: str, user_id: str) -> int:
+    with _get_connection() as conn:
+        _init_db(conn)
+        row = conn.execute(
+            "SELECT pyha_count FROM user_counts WHERE chat_id = ? AND user_id = ?",
+            (chat_id, user_id),
+        ).fetchone()
+        return row[0] if row else 0
 
 
 def increment_count(chat_id: str, user_id: str, year_month: str | None = None) -> int:
@@ -67,16 +90,16 @@ def increment_count(chat_id: str, user_id: str, year_month: str | None = None) -
         _init_db(conn)
         conn.execute(
             """
-            INSERT INTO user_counts (chat_id, user_id, count)
-            VALUES (?, ?, 1)
-            ON CONFLICT(chat_id, user_id) DO UPDATE SET count = count + 1
+            INSERT INTO user_counts (chat_id, user_id, count, pyha_count)
+            VALUES (?, ?, 1, 0)
+            ON CONFLICT(chat_id, user_id) DO UPDATE SET count = count +     1
             """,
             (chat_id, user_id),
         )
         conn.execute(
             """
-            INSERT INTO monthly_counts (chat_id, user_id, year_month, count)
-            VALUES (?, ?, ?, 1)
+            INSERT INTO monthly_counts (chat_id, user_id, year_month, count, pyha_count)
+            VALUES (?, ?, ?, 1, 0)
             ON CONFLICT(chat_id, user_id, year_month) DO UPDATE SET count = count + 1
             """,
             (chat_id, user_id, month_key),
@@ -87,12 +110,47 @@ def increment_count(chat_id: str, user_id: str, year_month: str | None = None) -
             (chat_id, user_id),
         ).fetchone()[0]
 
+def pyha_increment(chat_id: str, user_id: str, year_month: str | None = None) -> int:
+    month_key = year_month or _current_year_month()
+    with _get_connection() as conn:
+        _init_db(conn)
+        conn.execute(
+            """
+            INSERT INTO user_counts (chat_id, user_id, count, pyha_count)
+            VALUES (?, ?, 0, 1)
+            ON CONFLICT(chat_id, user_id) DO UPDATE SET pyha_count = pyha_count + 1
+            """,
+            (chat_id, user_id),
+        )
+        conn.execute(
+            """
+            INSERT INTO monthly_counts (chat_id, user_id, year_month, count, pyha_count)
+            VALUES (?, ?, ?, 0, 1)
+            ON CONFLICT(chat_id, user_id, year_month) DO UPDATE SET pyha_count = pyha_count + 1
+            """,
+            (chat_id, user_id, month_key),
+        )
+        conn.commit()
+        row = conn.execute(
+            "SELECT pyha_count FROM user_counts WHERE chat_id = ? AND user_id = ?",
+            (chat_id, user_id),
+        ).fetchone()
+        return row[0] if row else 0
 
 def get_group_total(chat_id: str) -> int:
     with _get_connection() as conn:
         _init_db(conn)
         row = conn.execute(
             "SELECT COALESCE(SUM(count), 0) FROM user_counts WHERE chat_id = ?",
+            (chat_id,),
+        ).fetchone()
+        return row[0] if row else 0
+    
+def get_group_pyhat(chat_id: str) -> int:
+    with _get_connection() as conn:
+        _init_db(conn)
+        row = conn.execute(
+            "SELECT COALESCE(SUM(pyha_count), 0) FROM user_counts WHERE chat_id = ?",
             (chat_id,),
         ).fetchone()
         return row[0] if row else 0
@@ -112,6 +170,19 @@ def get_scoreboard(chat_id: str, limit: int = 10) -> list[tuple[str, int]]:
             (chat_id, limit),
         ).fetchall()
 
+def get_pyhascoreboard(chat_id: str, limit: int = 10) -> list[tuple[str, int]]:
+    with _get_connection() as conn:
+        _init_db(conn)
+        return conn.execute(
+            """
+            SELECT user_id, pyha_count
+            FROM user_counts
+            WHERE chat_id = ?
+            ORDER BY pyha_count DESC, user_id ASC
+            LIMIT ?
+            """,
+            (chat_id, limit),
+        ).fetchall()
 
 def get_monthly_scoreboard(chat_id: str, year_month: str, limit: int = 10) -> list[tuple[str, int]]:
     with _get_connection() as conn:
@@ -126,6 +197,20 @@ def get_monthly_scoreboard(chat_id: str, year_month: str, limit: int = 10) -> li
             """,
             (chat_id, year_month, limit),
         ).fetchall()
+    
+def get_monthly_pyhascoreboard(chat_id: str, year_month: str, limit: int = 10) -> list[tuple[str, int]]:
+    with _get_connection() as conn:
+        _init_db(conn)
+        return conn.execute(
+            """
+            SELECT user_id, pyha_count
+            FROM monthly_counts
+            WHERE chat_id = ? AND year_month = ?
+            ORDER BY pyha_count DESC, user_id ASC
+            LIMIT ? 
+            """,
+            (chat_id, year_month, limit),
+        ).fetchall()
 
 
 def get_monthly_group_total(chat_id: str, year_month: str) -> int:
@@ -133,6 +218,15 @@ def get_monthly_group_total(chat_id: str, year_month: str) -> int:
         _init_db(conn)
         row = conn.execute(
             "SELECT COALESCE(SUM(count), 0) FROM monthly_counts WHERE chat_id = ? AND year_month = ?",
+            (chat_id, year_month),
+        ).fetchone()
+        return row[0] if row else 0
+    
+def get_monthly_group_pyha_total(chat_id: str, year_month: str) -> int:
+    with _get_connection() as conn:
+        _init_db(conn)
+        row = conn.execute(
+            "SELECT COALESCE(SUM(pyha_count), 0) FROM monthly_counts WHERE chat_id = ? AND year_month = ?",
             (chat_id, year_month),
         ).fetchone()
         return row[0] if row else 0
