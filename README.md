@@ -9,6 +9,10 @@ Botin löytää telegrammista @kaliaa_bot
 
 Käyttäjät voi käyttää */kalia* komentoa kuvan otsikossa. Tämä lisää käyttäjälle yhden juodun kalian.
 
+### 🍻 Kalia
+
+Käyttäjät voi käyttää */pyha* komentoa kuvan otsikossa. Tämä lisää käyttäjälle yhden juodun Guinnessin.
+
 ### 🍻 Kaliacounter
 
 Käyttäjä voi käyttää */kaliacounter* komentoa. Botti kertoo montako kaliaa käyttäjä on juonut.
@@ -20,6 +24,10 @@ Käyttäjä voi käyttää */groupcounter* komentoa. Botti kertoo monta kaliaa r
 ### 🍻 Kaliatop
 
 Käyttäjä voi käyttää */kaliatop* tai */scoreboard* komentoa. Botti näyttää taulukon missä näkyy ryhmän top 10 kalian juojaa.
+
+### 🍻 Pyhatop
+
+Käyttäjä voi käyttää */pyhatop* tai */pyhascoreboard* komentoa. Botti näyttää taulukon missä näkyy ryhmän top 10 Guinnessin juojaa
 
 ### 🍻 Kuukausiraportti
 
