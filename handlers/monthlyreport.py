@@ -1,11 +1,9 @@
-import os
-from datetime import datetime, timedelta, timezone
-from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+from datetime import datetime
 from telegram.error import TelegramError
 from telegram.ext import ContextTypes
-from handlers.pyhascoreboard import build_pyhascoreboard_text, pyhascoreboard_command
 from handlers.scoreboard import build_scoreboard_text, scoreboard_command
 
+from helpers.report_helper import REPORT_TIMEZONE, get_previous_year_month
 from utils.storage import (
     get_all_chat_ids,
     get_monthly_group_total,
@@ -16,16 +14,6 @@ from utils.storage import (
     mark_monthly_report_sent,
 )
 
-try:
-    REPORT_TIMEZONE = ZoneInfo(os.getenv("REPORT_TIMEZONE"))
-except ZoneInfoNotFoundError:
-    REPORT_TIMEZONE = timezone.utc
-    print("REPORT_TIMEZONE not found, falling back to UTC.")
-
-def _get_previous_year_month(now: datetime) -> str:
-    previous_month = now.replace(day=1) - timedelta(days=1)
-    return previous_month.strftime("%Y-%m")
-
 
 async def send_monthly_kalia_report(context: ContextTypes.DEFAULT_TYPE):
     now = datetime.now(REPORT_TIMEZONE)
@@ -33,7 +21,7 @@ async def send_monthly_kalia_report(context: ContextTypes.DEFAULT_TYPE):
         print(f"[monthly report] skipping, not day 1")
         return
 
-    year_month = _get_previous_year_month(now)
+    year_month = get_previous_year_month(now)
     print(f"[monthly report] year_month={year_month}, chats={get_all_chat_ids()}")
 
     for chat_id in get_all_chat_ids():

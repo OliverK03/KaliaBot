@@ -1,31 +1,22 @@
 import os
 import threading
-from datetime import datetime, timedelta
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 from config.settings import BOT_TOKEN
 from telegram import Update
-from telegram.error import TelegramError
 from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
 
 from handlers.count import count_command
 from handlers.pyhacounter import pyha_command
 from handlers.groupcount import groupcount_command
+from handlers.daily_groupcount_message import send_daily_groupcount
 from handlers.help import help_command
 from handlers.messages import handle_message
 from handlers.pyhascoreboard import pyhascoreboard_command
 from handlers.scoreboard import scoreboard_command
 from handlers.text_or_caption import handle_text_or_caption_command
 from handlers.monthlyreport import send_monthly_kalia_report
-from utils.storage import (
-    get_all_chat_ids,
-    get_monthly_group_total,
-    get_monthly_group_pyha_total,
-    get_monthly_pyhascoreboard,
-    get_monthly_scoreboard,
-    has_monthly_report_been_sent,
-    mark_monthly_report_sent,
-)
+from helpers.report_helper import get_report_time
 
 
 # Healthserver jotta render deployaa web-service apin.
@@ -81,10 +72,14 @@ if __name__ == '__main__':
     app.add_error_handler(error)
 
     if app.job_queue:
-        app.job_queue.run_repeating(
+        app.job_queue.run_daily(
+            send_daily_groupcount,
+            time=get_report_time(),
+            name='daily_groupcount',
+        )
+        app.job_queue.run_daily(
             send_monthly_kalia_report,
-            interval=3600,
-            first=10,
+            time=get_report_time(),
             name='monthly_kalia_report',
         )
     start_health_server()
