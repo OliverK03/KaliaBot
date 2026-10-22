@@ -2,7 +2,10 @@ import argparse
 import os
 import sqlite3
 import sys
+from typing import Any
 
+import psycopg
+from utils.storage import get_database_connection
 
 def resolve_db_path(explicit_path: str | None) -> str:
     if explicit_path:
@@ -11,12 +14,12 @@ def resolve_db_path(explicit_path: str | None) -> str:
     return os.path.join(data_dir, "user_count.db")
 
 
-def get_scalar(conn: sqlite3.Connection, sql: str, params: tuple = ()) -> int:
+def get_scalar(conn: Any, sql: str, params: tuple = ()) -> int:
     row = conn.execute(sql, params).fetchone()
     return int(row[0]) if row and row[0] is not None else 0
 
 
-def print_summary(conn: sqlite3.Connection) -> None:
+def print_summary(conn: Any) -> None:
     total_users = get_scalar(conn, "SELECT COUNT(DISTINCT user_id) FROM user_counts")
     users_over_five = get_scalar(conn, "SELECT COUNT(DISTINCT user_id) FROM user_counts WHERE count > 5")
     total_kalia = get_scalar(conn, "SELECT COALESCE(SUM(count), 0) FROM user_counts")
@@ -56,18 +59,22 @@ def print_summary(conn: sqlite3.Connection) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Print usage stats from the bot SQLite database."
+        description="Print usage stats from the bot database."
     )
     parser.add_argument(
         "--db",
         dest="db_path",
-        help="Path to SQLite database file (default: $DATA_DIR/user_count.db or data/user_count.db).",
+        help=(
+            "Path to a SQLite database file. If omitted, uses DATABASE_URL when "
+            "set, otherwise $DATA_DIR/user_count.db."
+        ),
     )
     args = parser.parse_args()
 
     db_path = resolve_db_path(args.db_path)
+    uses_postgres = args.db_path is None and bool(os.getenv("DATABASE_URL"))
 
-    if not os.path.exists(db_path):
+    if not uses_postgres and not os.path.exists(db_path):
         print(f"Database not found at: {db_path}", file=sys.stderr)
         print(
             "Set DATA_DIR correctly or pass --db /path/to/user_count.db",
@@ -76,12 +83,15 @@ def main() -> int:
         return 1
 
     try:
-        with sqlite3.connect(db_path) as conn:
-            conn.row_factory = sqlite3.Row
-            print(f"Database: {db_path}")
+        with get_database_connection(db_path=args.db_path) as conn:
+            print(
+                "Database: PostgreSQL"
+                if uses_postgres
+                else f"Database: {db_path}"
+            )
             print_summary(conn)
-    except sqlite3.Error as exc:
-        print(f"SQLite error: {exc}", file=sys.stderr)
+    except (sqlite3.Error, psycopg.Error) as exc:
+        print(f"Database error: {exc}", file=sys.stderr)
         return 1
 
     return 0
