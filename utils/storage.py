@@ -184,7 +184,7 @@ def increment_count(
             INSERT INTO user_counts (chat_id, user_id, count, pyha_count, username, full_name)
             VALUES (?, ?, 1, 0, ?, ?)
             ON CONFLICT(chat_id, user_id) DO UPDATE SET
-                count = count + 1,
+                count = user_counts.count + 1,
                 username = COALESCE(NULLIF(excluded.username, ''), user_counts.username),
                 full_name = COALESCE(NULLIF(excluded.full_name, ''), user_counts.full_name)
             """,
@@ -194,7 +194,8 @@ def increment_count(
             """
             INSERT INTO monthly_counts (chat_id, user_id, year_month, count, pyha_count)
             VALUES (?, ?, ?, 1, 0)
-            ON CONFLICT(chat_id, user_id, year_month) DO UPDATE SET count = count + 1
+            ON CONFLICT(chat_id, user_id, year_month) DO UPDATE SET
+                count = monthly_counts.count + 1
             """,
             (chat_id, user_id, month_key),
         )
@@ -219,7 +220,7 @@ def pyha_increment(
             INSERT INTO user_counts (chat_id, user_id, count, pyha_count, username, full_name)
             VALUES (?, ?, 0, 1, ?, ?)
             ON CONFLICT(chat_id, user_id) DO UPDATE SET
-                pyha_count = pyha_count + 1,
+                pyha_count = user_counts.pyha_count + 1,
                 username = COALESCE(NULLIF(excluded.username, ''), user_counts.username),
                 full_name = COALESCE(NULLIF(excluded.full_name, ''), user_counts.full_name)
             """,
@@ -229,7 +230,8 @@ def pyha_increment(
             """
             INSERT INTO monthly_counts (chat_id, user_id, year_month, count, pyha_count)
             VALUES (?, ?, ?, 0, 1)
-            ON CONFLICT(chat_id, user_id, year_month) DO UPDATE SET pyha_count = pyha_count + 1
+            ON CONFLICT(chat_id, user_id, year_month) DO UPDATE SET
+                pyha_count = monthly_counts.pyha_count + 1
             """,
             (chat_id, user_id, month_key),
         )
@@ -264,7 +266,7 @@ def increment_holiton(
             INSERT INTO user_counts (chat_id, user_id, count, pyha_count, holiton_count, username, full_name)
             VALUES (?, ?, 0, 0, 1, ?, ?)
             ON CONFLICT(chat_id, user_id) DO UPDATE SET
-                holiton_count = holiton_count + 1,
+                holiton_count = user_counts.holiton_count + 1,
                 username = COALESCE(NULLIF(excluded.username, ''), user_counts.username),
                 full_name = COALESCE(NULLIF(excluded.full_name, ''), user_counts.full_name)
             """,
@@ -274,7 +276,8 @@ def increment_holiton(
             """
             INSERT INTO monthly_counts (chat_id, user_id, year_month, count, pyha_count, holiton_count)
             VALUES (?, ?, ?, 0, 0, 1)
-            ON CONFLICT(chat_id, user_id, year_month) DO UPDATE SET holiton_count = holiton_count + 1
+            ON CONFLICT(chat_id, user_id, year_month) DO UPDATE SET
+                holiton_count = monthly_counts.holiton_count + 1
             """,
             (chat_id, user_id, month_key),
         )
