@@ -1,14 +1,60 @@
 import os
 import sqlite3
+from contextlib import contextmanager
 from datetime import datetime
+from typing import Generator
+
+import psycopg
 
 DATA_DIR = os.getenv("DATA_DIR", "data")
 DB_FILE = os.path.join(DATA_DIR, "user_count.db")
 
 
-def _get_connection():
-    os.makedirs(DATA_DIR, exist_ok=True)
-    return sqlite3.connect(DB_FILE)
+class _PostgresConnection:
+    def __init__(self, connection: psycopg.Connection) -> None:
+        self._connection = connection
+
+    def execute(self, statement: str, params: tuple = ()):
+        return self._connection.execute(statement.replace("?", "%s"), params)
+
+    def executemany(self, statement: str, params):
+        return self._connection.executemany(statement.replace("?", "%s"), params)
+
+    def commit(self) -> None:
+        self._connection.commit()
+
+
+@contextmanager
+def _get_connection(
+    db_path: str | None = None, database_url: str | None = None
+):
+    url = database_url or (os.getenv("DATABASE_URL") if db_path is None else None)
+    if url:
+        raw_connection = psycopg.connect(url)
+        connection = _PostgresConnection(raw_connection)
+    else:
+        path = db_path or DB_FILE
+        os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+        raw_connection = sqlite3.connect(path)
+        connection = raw_connection
+
+    try:
+        yield connection
+        raw_connection.commit()
+    except Exception:
+        raw_connection.rollback()
+        raise
+    finally:
+        raw_connection.close()
+
+
+@contextmanager
+def get_database_connection(
+    db_path: str | None = None, database_url: str | None = None
+) -> Generator[object, None, None]:
+    with _get_connection(db_path, database_url) as conn:
+        _init_db(conn)
+        yield conn
 
 
 def _init_db(conn):
@@ -19,6 +65,7 @@ def _init_db(conn):
         user_id TEXT NOT NULL,
         count INTEGER NOT NULL,
         pyha_count INTEGER NOT NULL DEFAULT 0,
+        holiton_count INTEGER NOT NULL DEFAULT 0,
         username TEXT,
         full_name TEXT,
         PRIMARY KEY (chat_id, user_id)
@@ -33,6 +80,7 @@ def _init_db(conn):
         year_month TEXT NOT NULL,
         count INTEGER NOT NULL,
         pyha_count INTEGER NOT NULL DEFAULT 0,
+        holiton_count INTEGER NOT NULL DEFAULT 0,
         PRIMARY KEY (chat_id, user_id, year_month)
         )
         """
@@ -48,30 +96,51 @@ def _init_db(conn):
         """
     )
 
-    for table in ("user_counts", "monthly_counts"):
-        cursor = conn.execute(f"PRAGMA table_info({table})")
-        columns = {row[1] for row in cursor.fetchall()}
-        if "pyha_count" not in columns:
+    if isinstance(conn, _PostgresConnection):
+        for table in ("user_counts", "monthly_counts"):
             conn.execute(
-                f"ALTER TABLE {table} ADD COLUMN pyha_count INTEGER NOT NULL DEFAULT 0"
+                f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS "
+                "pyha_count INTEGER NOT NULL DEFAULT 0"
             )
-        # Ensure no NULL values remain (for older schemas without DEFAULT)
+            conn.execute(
+                f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS "
+                "holiton_count INTEGER NOT NULL DEFAULT 0"
+            )
         conn.execute(
-            f"UPDATE {table} SET pyha_count = 0 WHERE pyha_count IS NULL"
+            "ALTER TABLE user_counts ADD COLUMN IF NOT EXISTS username TEXT"
         )
-        if "holiton_count" not in columns:
-            conn.execute(
-                f"ALTER TABLE {table} ADD COLUMN holiton_count INTEGER NOT NULL DEFAULT 0"
-            )
+        conn.execute(
+            "ALTER TABLE user_counts ADD COLUMN IF NOT EXISTS full_name TEXT"
+        )
+    else:
+        for table in ("user_counts", "monthly_counts"):
+            cursor = conn.execute(f"PRAGMA table_info({table})")
+            columns = {row[1] for row in cursor.fetchall()}
+            if "pyha_count" not in columns:
+                conn.execute(
+                    f"ALTER TABLE {table} ADD COLUMN pyha_count "
+                    "INTEGER NOT NULL DEFAULT 0"
+                )
+            if "holiton_count" not in columns:
+                conn.execute(
+                    f"ALTER TABLE {table} ADD COLUMN holiton_count "
+                    "INTEGER NOT NULL DEFAULT 0"
+                )
+
+        user_columns = {
+            row[1]
+            for row in conn.execute("PRAGMA table_info(user_counts)").fetchall()
+        }
+        if "username" not in user_columns:
+            conn.execute("ALTER TABLE user_counts ADD COLUMN username TEXT")
+        if "full_name" not in user_columns:
+            conn.execute("ALTER TABLE user_counts ADD COLUMN full_name TEXT")
+
+    for table in ("user_counts", "monthly_counts"):
+        conn.execute(f"UPDATE {table} SET pyha_count = 0 WHERE pyha_count IS NULL")
         conn.execute(
             f"UPDATE {table} SET holiton_count = 0 WHERE holiton_count IS NULL"
         )
-
-    user_columns = {row[1] for row in conn.execute("PRAGMA table_info(user_counts)").fetchall()}
-    if "username" not in user_columns:
-        conn.execute("ALTER TABLE user_counts ADD COLUMN username TEXT")
-    if "full_name" not in user_columns:
-        conn.execute("ALTER TABLE user_counts ADD COLUMN full_name TEXT")
     conn.commit()
 
 
@@ -387,8 +456,9 @@ def mark_monthly_report_sent(chat_id: str, year_month: str):
         _init_db(conn)
         conn.execute(
             """
-            INSERT OR REPLACE INTO monthly_reports (chat_id, year_month, sent_at)
+            INSERT INTO monthly_reports (chat_id, year_month, sent_at)
             VALUES (?, ?, ?)
+            ON CONFLICT(chat_id, year_month) DO UPDATE SET sent_at = excluded.sent_at
             """,
             (chat_id, year_month, datetime.utcnow().isoformat()),
         )

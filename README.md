@@ -64,9 +64,9 @@ Botti lähettää kuukauden 1. päivä raportin montako kaliaa kuukaudessa on ju
 
 ## Tekniset tiedot
 
-Botti on tehty @BotFather tokenin avulla ja se rullaa dockerilla Renderissä. Itse botti on tehty Pythonilla ja databasena käytetty SQLite3:sta.
+Botti on tehty @BotFather tokenin avulla ja se rullaa dockerilla Renderissä. Botti käyttää PostgreSQL:ää, kun `DATABASE_URL` muuttuja on asetettu; muuten paikallisessa ajossa käytetään SQLite-tietokantaa.
+
 
 ## Muut tiedot
 
 Botti on ihan täysin vapaa-aika projekti, päivityksiä tulee joskus ja joulun jos tulee. Parannusvinkkejä voi laitella tg privassa @oliverkauppi.
-
