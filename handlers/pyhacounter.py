@@ -1,8 +1,7 @@
 from telegram import Update
 from telegram.ext import ContextTypes
 from telegram.error import TelegramError
-from utils.storage import increment_count
-from utils.storage import pyha_increment
+from utils.storage import record_drink_event
 
 async def pyha_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.photo or not update.message.caption:
@@ -17,15 +16,13 @@ async def pyha_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     chat_id = str(update.effective_chat.id)
     user_id = str(update.effective_user.id)
-    increment_count(
+    message = update.message
+    record_drink_event(
+        "/pyha",
         chat_id,
         user_id,
-        username=update.effective_user.username,
-        full_name=update.effective_user.full_name,
-    )
-    pyha_increment(
-        chat_id,
-        user_id,
+        telegram_message_id=message.message_id,
+        occurred_at=message.date,
         username=update.effective_user.username,
         full_name=update.effective_user.full_name,
     )

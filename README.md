@@ -64,7 +64,7 @@ Botti lähettää kuukauden 1. päivä raportin montako kaliaa kuukaudessa on ju
 
 ## Tekniset tiedot
 
-Botti on tehty @BotFather tokenin avulla ja se rullaa dockerilla Renderissä. Botti käyttää PostgreSQL-tietokantaa, ja `DATABASE_URL`-ympäristömuuttuja on pakollinen myös paikallisessa ajossa. Jokainen `/kalia`-komento tallentuu `kalia_events`-tauluun UTC-aikaleiman ja Telegram-viestin tunnisteen kanssa Power BI -raportointia varten.
+Botti on tehty @BotFather tokenin avulla ja se rullaa dockerilla Renderissä. Botti käyttää PostgreSQL-tietokantaa, ja `DATABASE_URL`-ympäristömuuttuja on pakollinen myös paikallisessa ajossa. Jokainen `/kalia`, `/pyha` ja `/hoplop`-komento tallentuu `kalia_events`-tauluun komennon, Helsingin aikavyöhykkeen aikaleiman ja Telegram-viestin tunnisteen kanssa Power BI -raportointia varten.
 
 
 ## Muut tiedot
