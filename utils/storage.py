@@ -1,13 +1,10 @@
 import os
-import sqlite3
 from contextlib import contextmanager
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Generator
+from uuid import uuid4
 
 import psycopg
-
-DATA_DIR = os.getenv("DATA_DIR", "data")
-DB_FILE = os.path.join(DATA_DIR, "user_count.db")
 
 
 class _PostgresConnection:
@@ -26,19 +23,13 @@ class _PostgresConnection:
 
 
 @contextmanager
-def _get_connection(
-    db_path: str | None = None, database_url: str | None = None
-):
-    url = database_url or (os.getenv("DATABASE_URL") if db_path is None else None)
-    if url:
-        raw_connection = psycopg.connect(url)
-        connection = _PostgresConnection(raw_connection)
-    else:
-        path = db_path or DB_FILE
-        os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
-        raw_connection = sqlite3.connect(path)
-        connection = raw_connection
+def _get_connection(database_url: str | None = None):
+    url = database_url or os.getenv("DATABASE_URL")
+    if not url:
+        raise RuntimeError("DATABASE_URL must be set to connect to PostgreSQL.")
 
+    raw_connection = psycopg.connect(url)
+    connection = _PostgresConnection(raw_connection)
     try:
         yield connection
         raw_connection.commit()
@@ -51,9 +42,9 @@ def _get_connection(
 
 @contextmanager
 def get_database_connection(
-    db_path: str | None = None, database_url: str | None = None
+    database_url: str | None = None,
 ) -> Generator[object, None, None]:
-    with _get_connection(db_path, database_url) as conn:
+    with _get_connection(database_url) as conn:
         _init_db(conn)
         yield conn
 
@@ -96,46 +87,35 @@ def _init_db(conn):
         )
         """
     )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS kalia_events (
+        event_id TEXT PRIMARY KEY,
+        chat_id TEXT NOT NULL,
+        user_id TEXT NOT NULL,
+        username TEXT,
+        full_name TEXT,
+        telegram_message_id BIGINT NOT NULL,
+        occurred_at_utc TEXT NOT NULL
+        )
+        """
+    )
 
-    if isinstance(conn, _PostgresConnection):
-        for table in ("user_counts", "monthly_counts"):
-            conn.execute(
-                f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS "
-                "pyha_count INTEGER NOT NULL DEFAULT 0"
-            )
-            conn.execute(
-                f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS "
-                "holiton_count INTEGER NOT NULL DEFAULT 0"
-            )
+    for table in ("user_counts", "monthly_counts"):
         conn.execute(
-            "ALTER TABLE user_counts ADD COLUMN IF NOT EXISTS username TEXT"
+            f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS "
+            "pyha_count INTEGER NOT NULL DEFAULT 0"
         )
         conn.execute(
-            "ALTER TABLE user_counts ADD COLUMN IF NOT EXISTS full_name TEXT"
+            f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS "
+            "holiton_count INTEGER NOT NULL DEFAULT 0"
         )
-    else:
-        for table in ("user_counts", "monthly_counts"):
-            cursor = conn.execute(f"PRAGMA table_info({table})")
-            columns = {row[1] for row in cursor.fetchall()}
-            if "pyha_count" not in columns:
-                conn.execute(
-                    f"ALTER TABLE {table} ADD COLUMN pyha_count "
-                    "INTEGER NOT NULL DEFAULT 0"
-                )
-            if "holiton_count" not in columns:
-                conn.execute(
-                    f"ALTER TABLE {table} ADD COLUMN holiton_count "
-                    "INTEGER NOT NULL DEFAULT 0"
-                )
-
-        user_columns = {
-            row[1]
-            for row in conn.execute("PRAGMA table_info(user_counts)").fetchall()
-        }
-        if "username" not in user_columns:
-            conn.execute("ALTER TABLE user_counts ADD COLUMN username TEXT")
-        if "full_name" not in user_columns:
-            conn.execute("ALTER TABLE user_counts ADD COLUMN full_name TEXT")
+    conn.execute(
+        "ALTER TABLE user_counts ADD COLUMN IF NOT EXISTS username TEXT"
+    )
+    conn.execute(
+        "ALTER TABLE user_counts ADD COLUMN IF NOT EXISTS full_name TEXT"
+    )
 
     for table in ("user_counts", "monthly_counts"):
         conn.execute(f"UPDATE {table} SET pyha_count = 0 WHERE pyha_count IS NULL")
@@ -168,6 +148,40 @@ def get_pyhat(chat_id: str, user_id: str) -> int:
         return row[0] if row else 0
 
 
+def _increment_count(
+    conn,
+    chat_id: str,
+    user_id: str,
+    month_key: str,
+    username: str | None,
+    full_name: str | None,
+) -> int:
+    conn.execute(
+        """
+        INSERT INTO user_counts (chat_id, user_id, count, pyha_count, username, full_name)
+        VALUES (?, ?, 1, 0, ?, ?)
+        ON CONFLICT(chat_id, user_id) DO UPDATE SET
+            count = user_counts.count + 1,
+            username = COALESCE(NULLIF(excluded.username, ''), user_counts.username),
+            full_name = COALESCE(NULLIF(excluded.full_name, ''), user_counts.full_name)
+        """,
+        (chat_id, user_id, username, full_name),
+    )
+    conn.execute(
+        """
+        INSERT INTO monthly_counts (chat_id, user_id, year_month, count, pyha_count)
+        VALUES (?, ?, ?, 1, 0)
+        ON CONFLICT(chat_id, user_id, year_month) DO UPDATE SET
+            count = monthly_counts.count + 1
+        """,
+        (chat_id, user_id, month_key),
+    )
+    return conn.execute(
+        "SELECT count FROM user_counts WHERE chat_id = ? AND user_id = ?",
+        (chat_id, user_id),
+    ).fetchone()[0]
+
+
 def increment_count(
     chat_id: str,
     user_id: str,
@@ -179,31 +193,52 @@ def increment_count(
 
     with _get_connection() as conn:
         _init_db(conn)
-        conn.execute(
-            """
-            INSERT INTO user_counts (chat_id, user_id, count, pyha_count, username, full_name)
-            VALUES (?, ?, 1, 0, ?, ?)
-            ON CONFLICT(chat_id, user_id) DO UPDATE SET
-                count = user_counts.count + 1,
-                username = COALESCE(NULLIF(excluded.username, ''), user_counts.username),
-                full_name = COALESCE(NULLIF(excluded.full_name, ''), user_counts.full_name)
-            """,
-            (chat_id, user_id, username, full_name),
-        )
-        conn.execute(
-            """
-            INSERT INTO monthly_counts (chat_id, user_id, year_month, count, pyha_count)
-            VALUES (?, ?, ?, 1, 0)
-            ON CONFLICT(chat_id, user_id, year_month) DO UPDATE SET
-                count = monthly_counts.count + 1
-            """,
-            (chat_id, user_id, month_key),
+        count = _increment_count(
+            conn, chat_id, user_id, month_key, username, full_name
         )
         conn.commit()
-        return conn.execute(
-            "SELECT count FROM user_counts WHERE chat_id = ? AND user_id = ?",
-            (chat_id, user_id),
-        ).fetchone()[0]
+        return count
+
+
+def increment_kalia_count(
+    chat_id: str,
+    user_id: str,
+    telegram_message_id: int,
+    occurred_at: datetime,
+    username: str | None = None,
+    full_name: str | None = None,
+) -> int:
+    if occurred_at.tzinfo is None or occurred_at.utcoffset() is None:
+        raise ValueError("occurred_at must be timezone-aware")
+
+    occurred_at_utc = occurred_at.astimezone(timezone.utc)
+    month_key = occurred_at_utc.strftime("%Y-%m")
+    with _get_connection() as conn:
+        _init_db(conn)
+        count = _increment_count(
+            conn, chat_id, user_id, month_key, username, full_name
+        )
+        conn.execute(
+            """
+            INSERT INTO kalia_events (
+                event_id, chat_id, user_id, username, full_name,
+                telegram_message_id, occurred_at_utc
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                str(uuid4()),
+                chat_id,
+                user_id,
+                username,
+                full_name,
+                telegram_message_id,
+                occurred_at_utc.isoformat(),
+            ),
+        )
+        conn.commit()
+        return count
+
 
 def pyha_increment(
     chat_id: str,

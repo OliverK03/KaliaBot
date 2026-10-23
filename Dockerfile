@@ -41,10 +41,6 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 # Copy the source code into the container.
 COPY . .
 
-# Ensure the data directory is writable by the app user.
-RUN mkdir -p data \
-    && chown -R appuser:appuser data
-
 # Switch to the non-privileged user to run the application.
 USER appuser
 

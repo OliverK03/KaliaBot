@@ -17,7 +17,7 @@ from handlers.scoreboard import scoreboard_command
 from handlers.text_or_caption import handle_text_or_caption_command
 from handlers.monthlyreport import send_monthly_kalia_report
 from helpers.report_helper import get_report_time
-from utils.migration import migrate_sqlite_to_postgres
+from utils.storage import get_database_connection
 
 
 # Healthserver jotta render deployaa web-service apin.
@@ -54,11 +54,8 @@ async def error(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 if __name__ == '__main__':
     print('Starting bot...')
-    if os.getenv("MIGRATE_SQLITE_TO_POSTGRES", "").lower() in ("1", "true", "yes"):
-        sqlite_path = os.path.join(
-            os.getenv("DATA_DIR", "data"), "user_count.db"
-        )
-        migrate_sqlite_to_postgres(sqlite_path)
+    with get_database_connection():
+        pass
 
     app = Application.builder().token(BOT_TOKEN).build()
 
