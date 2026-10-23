@@ -1,7 +1,7 @@
 from telegram import Update
 from telegram.error import TelegramError
 from telegram.ext import ContextTypes
-from utils.storage import get_holiton, increment_holiton
+from utils.storage import record_drink_event
 
 
 async def hoplop_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -17,9 +17,13 @@ async def hoplop_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     chat_id = str(update.effective_chat.id)
     user_id = str(update.effective_user.id)
-    count = increment_holiton(
+    message = update.message
+    record_drink_event(
+        "/hoplop",
         chat_id,
         user_id,
+        telegram_message_id=message.message_id,
+        occurred_at=message.date,
         username=update.effective_user.username,
         full_name=update.effective_user.full_name,
     )

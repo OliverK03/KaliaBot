@@ -1,10 +1,13 @@
 import os
 from contextlib import contextmanager
-from datetime import datetime, timezone
-from typing import Generator
+from datetime import datetime
+from typing import Generator, Literal
 from uuid import uuid4
+from zoneinfo import ZoneInfo
 
 import psycopg
+
+HELSINKI_TIMEZONE = ZoneInfo("Europe/Helsinki")
 
 
 class _PostgresConnection:
@@ -96,9 +99,41 @@ def _init_db(conn):
         username TEXT,
         full_name TEXT,
         telegram_message_id BIGINT NOT NULL,
-        occurred_at_utc TEXT NOT NULL
+        occurred_at TEXT NOT NULL,
+        command TEXT NOT NULL DEFAULT '/kalia'
         )
         """
+    )
+    event_columns = {
+        row[0]
+        for row in conn.execute(
+            """
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_schema = current_schema()
+              AND table_name = 'kalia_events'
+            """
+        ).fetchall()
+    }
+    if "occurred_at_utc" in event_columns and "occurred_at" not in event_columns:
+        rows = conn.execute(
+            "SELECT event_id, occurred_at_utc FROM kalia_events"
+        ).fetchall()
+        for event_id, occurred_at_utc in rows:
+            occurred_at_helsinki = datetime.fromisoformat(
+                occurred_at_utc
+            ).astimezone(HELSINKI_TIMEZONE)
+            conn.execute(
+                "UPDATE kalia_events SET occurred_at_utc = ? WHERE event_id = ?",
+                (occurred_at_helsinki.isoformat(), event_id),
+            )
+        conn.execute(
+            "ALTER TABLE kalia_events "
+            "RENAME COLUMN occurred_at_utc TO occurred_at"
+        )
+    conn.execute(
+        "ALTER TABLE kalia_events "
+        "ADD COLUMN IF NOT EXISTS command TEXT NOT NULL DEFAULT '/kalia'"
     )
 
     for table in ("user_counts", "monthly_counts"):
@@ -200,7 +235,8 @@ def increment_count(
         return count
 
 
-def increment_kalia_count(
+def record_drink_event(
+    command: Literal["/kalia", "/pyha", "/hoplop"],
     chat_id: str,
     user_id: str,
     telegram_message_id: int,
@@ -208,23 +244,89 @@ def increment_kalia_count(
     username: str | None = None,
     full_name: str | None = None,
 ) -> int:
+    if command not in ("/kalia", "/pyha", "/hoplop"):
+        raise ValueError(f"Unsupported drink command: {command}")
     if occurred_at.tzinfo is None or occurred_at.utcoffset() is None:
         raise ValueError("occurred_at must be timezone-aware")
 
-    occurred_at_utc = occurred_at.astimezone(timezone.utc)
-    month_key = occurred_at_utc.strftime("%Y-%m")
+    occurred_at_helsinki = occurred_at.astimezone(HELSINKI_TIMEZONE)
+    month_key = occurred_at_helsinki.strftime("%Y-%m")
     with _get_connection() as conn:
         _init_db(conn)
-        count = _increment_count(
-            conn, chat_id, user_id, month_key, username, full_name
-        )
+        count = 0
+        if command in ("/kalia", "/pyha"):
+            count = _increment_count(
+                conn, chat_id, user_id, month_key, username, full_name
+            )
+        if command == "/pyha":
+            conn.execute(
+                """
+                INSERT INTO user_counts (
+                    chat_id, user_id, count, pyha_count, username, full_name
+                )
+                VALUES (?, ?, 0, 1, ?, ?)
+                ON CONFLICT(chat_id, user_id) DO UPDATE SET
+                    pyha_count = user_counts.pyha_count + 1,
+                    username = COALESCE(NULLIF(excluded.username, ''), user_counts.username),
+                    full_name = COALESCE(NULLIF(excluded.full_name, ''), user_counts.full_name)
+                """,
+                (chat_id, user_id, username, full_name),
+            )
+            conn.execute(
+                """
+                INSERT INTO monthly_counts (
+                    chat_id, user_id, year_month, count, pyha_count
+                )
+                VALUES (?, ?, ?, 0, 1)
+                ON CONFLICT(chat_id, user_id, year_month) DO UPDATE SET
+                    pyha_count = monthly_counts.pyha_count + 1
+                """,
+                (chat_id, user_id, month_key),
+            )
+            count = conn.execute(
+                "SELECT pyha_count FROM user_counts "
+                "WHERE chat_id = ? AND user_id = ?",
+                (chat_id, user_id),
+            ).fetchone()[0]
+        elif command == "/hoplop":
+            conn.execute(
+                """
+                INSERT INTO user_counts (
+                    chat_id, user_id, count, pyha_count, holiton_count,
+                    username, full_name
+                )
+                VALUES (?, ?, 0, 0, 1, ?, ?)
+                ON CONFLICT(chat_id, user_id) DO UPDATE SET
+                    holiton_count = user_counts.holiton_count + 1,
+                    username = COALESCE(NULLIF(excluded.username, ''), user_counts.username),
+                    full_name = COALESCE(NULLIF(excluded.full_name, ''), user_counts.full_name)
+                """,
+                (chat_id, user_id, username, full_name),
+            )
+            conn.execute(
+                """
+                INSERT INTO monthly_counts (
+                    chat_id, user_id, year_month, count, pyha_count, holiton_count
+                )
+                VALUES (?, ?, ?, 0, 0, 1)
+                ON CONFLICT(chat_id, user_id, year_month) DO UPDATE SET
+                    holiton_count = monthly_counts.holiton_count + 1
+                """,
+                (chat_id, user_id, month_key),
+            )
+            count = conn.execute(
+                "SELECT holiton_count FROM user_counts "
+                "WHERE chat_id = ? AND user_id = ?",
+                (chat_id, user_id),
+            ).fetchone()[0]
+
         conn.execute(
             """
             INSERT INTO kalia_events (
                 event_id, chat_id, user_id, username, full_name,
-                telegram_message_id, occurred_at_utc
+                telegram_message_id, occurred_at, command
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 str(uuid4()),
@@ -233,11 +335,31 @@ def increment_kalia_count(
                 username,
                 full_name,
                 telegram_message_id,
-                occurred_at_utc.isoformat(),
+                occurred_at_helsinki.isoformat(),
+                command,
             ),
         )
         conn.commit()
         return count
+
+
+def increment_kalia_count(
+    chat_id: str,
+    user_id: str,
+    telegram_message_id: int,
+    occurred_at: datetime,
+    username: str | None = None,
+    full_name: str | None = None,
+) -> int:
+    return record_drink_event(
+        "/kalia",
+        chat_id,
+        user_id,
+        telegram_message_id,
+        occurred_at,
+        username,
+        full_name,
+    )
 
 
 def pyha_increment(
